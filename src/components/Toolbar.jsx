@@ -15,6 +15,7 @@ import {
   Palette,
   Tag,
   Upload,
+  Cloud,
 } from "lucide-react";
 import { MONTH_NAMES } from "../utils/calendarUtils";
 import { PRESET_THEMES } from "../data/presetThemes";
@@ -39,6 +40,7 @@ export default function Toolbar({
   onLoadTemplate,
   isFullscreen,
   onToggleFullscreen,
+  draftSavedAt = null,
 }) {
   const fileInputRef = useRef(null);
 
@@ -77,6 +79,10 @@ export default function Toolbar({
       setMonthIndex((m) => m + 1);
     }
   };
+
+  const draftLabel = draftSavedAt
+    ? `Draft saved ${draftSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+    : null;
 
   return (
     <header className="top-toolbar">
@@ -203,6 +209,13 @@ export default function Toolbar({
 
       {/* Right: Zoom & Export Actions */}
       <div className="toolbar-right">
+        {draftLabel && (
+          <div className="draft-saved-indicator" title="Autosaved to this browser">
+            <Cloud size={13} />
+            <span>{draftLabel}</span>
+          </div>
+        )}
+
         {/* Zoom Controls */}
         <div className="zoom-controls-group">
           <button

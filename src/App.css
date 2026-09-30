@@ -2515,3 +2515,23 @@
 .btn-text-dim:hover {
   color: var(--text-main);
 }
+
+/* --- Draft autosave indicator (kept from product-completion pass) --- */
+.draft-saved-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #34d399;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+@media (max-width: 1180px) {
+  .draft-saved-indicator span {
+    display: none;
+  }
+}

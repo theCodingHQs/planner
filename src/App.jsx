@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Toolbar from './components/Toolbar';
 import SidebarControls from './components/SidebarControls';
 import CalendarCanvas from './components/CalendarCanvas';
@@ -12,8 +12,36 @@ import { MONTH_NAMES, DEFAULT_HOLIDAYS } from './utils/calendarUtils';
 import { getSavedLicense } from './utils/gumroadService';
 import './App.css';
 
+const AUTOSAVE_KEY = 'plancraft_autosave_v1';
+const MAX_BG_DATA_URL_CHARS = 1.5 * 1024 * 1024; // ~1.5MB — skip huge uploads
+
+function loadAutosave() {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('Autosave restore failed:', err);
+    return null;
+  }
+}
+
+function sanitizeBgForSave(bgImage) {
+  if (!bgImage || typeof bgImage !== 'string') return bgImage || '';
+  if (bgImage.startsWith('data:') && bgImage.length > MAX_BG_DATA_URL_CHARS) {
+    return ''; // skip oversized data URLs
+  }
+  return bgImage;
+}
+
 export default function App() {
   const canvasRef = useRef(null);
+  const autosaveReady = useRef(false);
+  const savedDraft = useRef(null);
+  if (savedDraft.current === null) {
+    savedDraft.current = loadAutosave();
+  }
+  const draft = savedDraft.current;
 
   // Pro License State (sync with localStorage)
   const [proLicense, setProLicense] = useState(getSavedLicense());
@@ -22,57 +50,71 @@ export default function App() {
   const initialTheme = PRESET_THEMES[0];
 
   // Mode: 'monthly' | 'weekly'
-  const [plannerMode, setPlannerMode] = useState('monthly');
+  const [plannerMode, setPlannerMode] = useState(draft?.plannerMode || 'monthly');
 
   // Monthly Planner state
-  const [year, setYear] = useState(2026);
-  const [monthIndex, setMonthIndex] = useState(9); // October
-  const [startOfWeek, setStartOfWeek] = useState(1); // 1 = Monday, 0 = Sunday
-  const [customTitle, setCustomTitle] = useState('October');
-  const [customYear, setCustomYear] = useState('2026');
-  const [subtitle, setSubtitle] = useState('');
-  const [bgImage, setBgImage] = useState(initialTheme.bgImage);
-  const [pageFormat, setPageFormat] = useState(PAGE_FORMATS[0]); // US Letter Landscape
-  const [styles, setStyles] = useState(initialTheme.styles);
+  const [year, setYear] = useState(draft?.year ?? 2026);
+  const [monthIndex, setMonthIndex] = useState(draft?.monthIndex ?? 9); // October
+  const [startOfWeek, setStartOfWeek] = useState(draft?.startOfWeek ?? 1); // 1 = Monday, 0 = Sunday
+  const [customTitle, setCustomTitle] = useState(
+    draft?.customTitle ?? MONTH_NAMES[draft?.monthIndex ?? 9] ?? 'October',
+  );
+  const [customYear, setCustomYear] = useState(draft?.customYear ?? '2026');
+  const [subtitle, setSubtitle] = useState(draft?.subtitle ?? '');
+  const [bgImage, setBgImage] = useState(draft?.bgImage ?? initialTheme.bgImage);
+  const [pageFormat, setPageFormat] = useState(draft?.pageFormat || PAGE_FORMATS[0]); // US Letter Landscape
+  const [styles, setStyles] = useState(draft?.styles || initialTheme.styles);
 
   // Weekly Planner state (100% Undated - Weekdays only)
-  const [weeklyTitle, setWeeklyTitle] = useState('Weekly Planner');
-  const [weeklySubtitle, setWeeklySubtitle] = useState('');
-  const [weeklyLayout, setWeeklyLayout] = useState('columns-7'); // 'columns-7' | 'grid-8' | 'horizontal' | 'dashboard'
-  const [weeklyInteriorStyle, setWeeklyInteriorStyle] = useState('lines'); // 'lines' | 'checkboxes' | 'schedule' | 'blank'
-  const [weeklyPriorities, setWeeklyPriorities] = useState([
-    'Top project deliverable',
-    'Self-care & workout routine',
-    'Weekly review & organization'
-  ]);
-  const [habits, setHabits] = useState([
-    'Hydration (2L)',
-    'Workout / Walk',
-    'Read 20 Mins',
-    'Sleep 8 Hours'
-  ]);
+  const [weeklyTitle, setWeeklyTitle] = useState(draft?.weeklyTitle || 'Weekly Planner');
+  const [weeklySubtitle, setWeeklySubtitle] = useState(draft?.weeklySubtitle || '');
+  const [weeklyLayout, setWeeklyLayout] = useState(draft?.weeklyLayout || 'columns-7'); // 'columns-7' | 'grid-8' | 'horizontal' | 'dashboard'
+  const [weeklyInteriorStyle, setWeeklyInteriorStyle] = useState(
+    draft?.weeklyInteriorStyle || 'lines',
+  ); // 'lines' | 'checkboxes' | 'schedule' | 'blank'
+  const [weeklyPriorities, setWeeklyPriorities] = useState(
+    draft?.weeklyPriorities || [
+      'Top project deliverable',
+      'Self-care & workout routine',
+      'Weekly review & organization',
+    ],
+  );
+  const [habits, setHabits] = useState(
+    draft?.habits || [
+      'Hydration (2L)',
+      'Workout / Walk',
+      'Read 20 Mins',
+      'Sleep 8 Hours',
+    ],
+  );
   const [weeklyNotes, setWeeklyNotes] = useState(
-    '- Important follow-ups\n- Meal plan ideas\n- Weekend errands'
+    draft?.weeklyNotes ?? '- Important follow-ups\n- Meal plan ideas\n- Weekend errands',
   );
   
   // Custom events & stickers per dateKey / weekdayKey (e.g. '2026-10-31' or 'weekly-mon')
-  const [events, setEvents] = useState({
-    '2026-10-31': { title: '🎃 Halloween', color: '#ea580c', textColor: '#ffffff' },
-    'weekly-fri': { title: '🎉 TGIF Review', color: '#ea580c', textColor: '#ffffff' }
-  });
-  const [stickers, setStickers] = useState({
-    '2026-10-31': '👻',
-    'weekly-fri': '✨'
-  });
+  const [events, setEvents] = useState(
+    draft?.events || {
+      '2026-10-31': { title: '🎃 Halloween', color: '#ea580c', textColor: '#ffffff' },
+      'weekly-fri': { title: '🎉 TGIF Review', color: '#ea580c', textColor: '#ffffff' },
+    },
+  );
+  const [stickers, setStickers] = useState(
+    draft?.stickers || {
+      '2026-10-31': '👻',
+      'weekly-fri': '✨',
+    },
+  );
 
   // Notes column for monthly
-  const [showNotesColumn, setShowNotesColumn] = useState(false);
-  const [notesList, setNotesList] = useState([
-    'Decorate house for Halloween',
-    'Order cute treat bags',
-    'Finish autumn project milestones',
-    'Pumpkin carving night'
-  ]);
+  const [showNotesColumn, setShowNotesColumn] = useState(draft?.showNotesColumn ?? false);
+  const [notesList, setNotesList] = useState(
+    draft?.notesList || [
+      'Decorate house for Halloween',
+      'Order cute treat bags',
+      'Finish autumn project milestones',
+      'Pumpkin carving night',
+    ],
+  );
 
   // UI Modals & Zoom
   const [zoom, setZoom] = useState(1);
@@ -81,6 +123,17 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isComplianceOpen, setIsComplianceOpen] = useState(false);
   const [complianceInitialTab, setComplianceInitialTab] = useState('plans');
+  const [draftSavedAt, setDraftSavedAt] = useState(
+    draft?.savedAt ? new Date(draft.savedAt) : null,
+  );
+
+  useEffect(() => {
+    // Skip the first paint so we don't overwrite a just-restored draft with defaults
+    const t = setTimeout(() => {
+      autosaveReady.current = true;
+    }, 400);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleOpenCompliance = (tab = 'plans') => {
     setComplianceInitialTab(tab);
@@ -250,6 +303,69 @@ export default function App() {
     weeklyNotes
   };
 
+
+  const persistAutosave = useCallback(() => {
+    if (!autosaveReady.current) return;
+    try {
+      const payload = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        plannerMode,
+        year,
+        monthIndex,
+        startOfWeek,
+        customTitle,
+        customYear,
+        subtitle,
+        bgImage: sanitizeBgForSave(bgImage),
+        pageFormat,
+        styles,
+        events,
+        stickers,
+        showNotesColumn,
+        notesList,
+        weeklyLayout,
+        weeklyInteriorStyle,
+        weeklyPriorities,
+        habits,
+        weeklyNotes,
+        weeklyTitle,
+        weeklySubtitle,
+      };
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+      setDraftSavedAt(new Date());
+    } catch (err) {
+      console.warn('Autosave failed:', err);
+    }
+  }, [
+    plannerMode,
+    year,
+    monthIndex,
+    startOfWeek,
+    customTitle,
+    customYear,
+    subtitle,
+    bgImage,
+    pageFormat,
+    styles,
+    events,
+    stickers,
+    showNotesColumn,
+    notesList,
+    weeklyLayout,
+    weeklyInteriorStyle,
+    weeklyPriorities,
+    habits,
+    weeklyNotes,
+    weeklyTitle,
+    weeklySubtitle,
+  ]);
+
+  useEffect(() => {
+    const timer = setTimeout(persistAutosave, 600);
+    return () => clearTimeout(timer);
+  }, [persistAutosave]);
+
   return (
     <div className="app-container">
       {/* Top Studio Toolbar */}
@@ -273,6 +389,7 @@ export default function App() {
         onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
         onOpenCompliance={handleOpenCompliance}
         onLoadTemplate={handleLoadTemplate}
+        draftSavedAt={draftSavedAt}
       />
 
       {/* Main Studio Workspace: Sidebar Controls + Live Canvas Artboard */}
