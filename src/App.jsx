@@ -34,7 +34,12 @@ function sanitizeBgForSave(bgImage) {
   return bgImage;
 }
 
-export default function App({ onGoHome } = {}) {
+export default function App({
+  onGoHome,
+  initialThemeId,
+  initialMode,
+  initialLayout,
+} = {}) {
   const canvasRef = useRef(null);
   const autosaveReady = useRef(false);
   const savedDraft = useRef(null);
@@ -46,29 +51,54 @@ export default function App({ onGoHome } = {}) {
   // Pro License State (sync with localStorage)
   const [proLicense, setProLicense] = useState(getSavedLicense());
 
-  // Initialize with Halloween preset (matches user's screenshot!)
-  const initialTheme = PRESET_THEMES[0];
+  // Check if a specific theme was requested via URL/Landing Page click
+  const requestedTheme = initialThemeId
+    ? PRESET_THEMES.find((t) => t.id === initialThemeId)
+    : null;
+
+  // Default theme fallback
+  const initialTheme = requestedTheme || PRESET_THEMES[0];
 
   // Mode: 'monthly' | 'weekly'
-  const [plannerMode, setPlannerMode] = useState(draft?.plannerMode || 'monthly');
+  const [plannerMode, setPlannerMode] = useState(
+    initialMode || (requestedTheme ? 'monthly' : draft?.plannerMode || 'monthly'),
+  );
 
   // Monthly Planner state
-  const [year, setYear] = useState(draft?.year ?? 2026);
-  const [monthIndex, setMonthIndex] = useState(draft?.monthIndex ?? 9); // October
+  const [year, setYear] = useState(
+    requestedTheme?.defaultYear ?? draft?.year ?? 2026,
+  );
+  const [monthIndex, setMonthIndex] = useState(
+    requestedTheme?.defaultMonth ?? draft?.monthIndex ?? 9,
+  );
   const [startOfWeek, setStartOfWeek] = useState(draft?.startOfWeek ?? 1); // 1 = Monday, 0 = Sunday
   const [customTitle, setCustomTitle] = useState(
-    draft?.customTitle ?? MONTH_NAMES[draft?.monthIndex ?? 9] ?? 'October',
+    requestedTheme
+      ? (requestedTheme.defaultMonth !== undefined ? MONTH_NAMES[requestedTheme.defaultMonth] : 'October')
+      : draft?.customTitle ?? MONTH_NAMES[draft?.monthIndex ?? 9] ?? 'October',
   );
-  const [customYear, setCustomYear] = useState(draft?.customYear ?? '2026');
-  const [subtitle, setSubtitle] = useState(draft?.subtitle ?? '');
-  const [bgImage, setBgImage] = useState(draft?.bgImage ?? initialTheme.bgImage);
+  const [customYear, setCustomYear] = useState(
+    requestedTheme
+      ? String(requestedTheme.defaultYear ?? 2026)
+      : draft?.customYear ?? '2026',
+  );
+  const [subtitle, setSubtitle] = useState(requestedTheme ? '' : draft?.subtitle ?? '');
+  const [bgImage, setBgImage] = useState(
+    requestedTheme ? requestedTheme.bgImage : draft?.bgImage ?? initialTheme.bgImage,
+  );
   const [pageFormat, setPageFormat] = useState(draft?.pageFormat || PAGE_FORMATS[0]); // US Letter Landscape
-  const [styles, setStyles] = useState(draft?.styles || initialTheme.styles);
+  const [styles, setStyles] = useState(
+    requestedTheme
+      ? { titleOffsetX: 0, titleOffsetY: 0, ...requestedTheme.styles }
+      : draft?.styles || initialTheme.styles,
+  );
 
   // Weekly Planner state (100% Undated - Weekdays only)
   const [weeklyTitle, setWeeklyTitle] = useState(draft?.weeklyTitle || 'Weekly Planner');
   const [weeklySubtitle, setWeeklySubtitle] = useState(draft?.weeklySubtitle || '');
-  const [weeklyLayout, setWeeklyLayout] = useState(draft?.weeklyLayout || 'columns-7'); // 'columns-7' | 'grid-8' | 'horizontal' | 'dashboard'
+  const [weeklyLayout, setWeeklyLayout] = useState(
+    initialLayout || draft?.weeklyLayout || 'columns-7',
+  ); // 'columns-7' | 'grid-8' | 'horizontal' | 'dashboard'
   const [weeklyInteriorStyle, setWeeklyInteriorStyle] = useState(
     draft?.weeklyInteriorStyle || 'lines',
   ); // 'lines' | 'checkboxes' | 'schedule' | 'blank'
