@@ -16,6 +16,7 @@ import {
   Tag,
   Upload,
   Cloud,
+  Home,
 } from "lucide-react";
 import { MONTH_NAMES } from "../utils/calendarUtils";
 import { PRESET_THEMES } from "../data/presetThemes";
@@ -41,6 +42,7 @@ export default function Toolbar({
   isFullscreen,
   onToggleFullscreen,
   draftSavedAt = null,
+  onGoHome,
 }) {
   const fileInputRef = useRef(null);
 
@@ -114,6 +116,18 @@ export default function Toolbar({
             </button>
           )}
         </div>
+
+        {onGoHome && (
+          <button
+            type="button"
+            className="btn-toolbar-ghost btn-go-home"
+            onClick={onGoHome}
+            title="Back to home"
+          >
+            <Home size={14} />
+            <span>Home</span>
+          </button>
+        )}
 
         {/* Mode Switcher: Monthly vs. Weekly */}
         <div className="planner-mode-toggle">
@@ -210,7 +224,10 @@ export default function Toolbar({
       {/* Right: Zoom & Export Actions */}
       <div className="toolbar-right">
         {draftLabel && (
-          <div className="draft-saved-indicator" title="Autosaved to this browser">
+          <div
+            className="draft-saved-indicator"
+            title="Autosaved to this browser"
+          >
             <Cloud size={13} />
             <span>{draftLabel}</span>
           </div>

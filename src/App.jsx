@@ -34,7 +34,7 @@ function sanitizeBgForSave(bgImage) {
   return bgImage;
 }
 
-export default function App() {
+export default function App({ onGoHome } = {}) {
   const canvasRef = useRef(null);
   const autosaveReady = useRef(false);
   const savedDraft = useRef(null);
@@ -390,6 +390,7 @@ export default function App() {
         onOpenCompliance={handleOpenCompliance}
         onLoadTemplate={handleLoadTemplate}
         draftSavedAt={draftSavedAt}
+        onGoHome={onGoHome}
       />
 
       {/* Main Studio Workspace: Sidebar Controls + Live Canvas Artboard */}
